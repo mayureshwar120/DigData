@@ -3,6 +3,8 @@ import { Sparkles, TrendingUp, AlertCircle, Info, Activity } from 'lucide-react'
 import { buildDatasetDigest } from '../lib/datasetDigest';
 import { buildLocalInsights, isMissingAiRouteError } from '../lib/localAiFallback';
 
+const hasAiDevRoutes = import.meta.env.DEV;
+
 const isNumeric = (value) => typeof value === 'number' && Number.isFinite(value);
 
 const getPercentile = (sortedValues, percentile) => {
@@ -177,6 +179,15 @@ const AIInsights = ({ data, fields, fileName }) => {
       setAiError('');
       setAiSummary('');
       setUsingFallback(false);
+
+      if (!hasAiDevRoutes) {
+        if (!cancelled) {
+          setAiSummary(buildLocalInsights(datasetDigest, fileName));
+          setUsingFallback(true);
+          setAiLoading(false);
+        }
+        return;
+      }
 
       try {
         const response = await fetch('/api/ai/insights', {

@@ -3,6 +3,8 @@ import { MessageSquare, Send, Bot, User } from 'lucide-react';
 import { buildDatasetDigest } from '../lib/datasetDigest';
 import { buildLocalQaAnswer, isMissingAiRouteError } from '../lib/localAiFallback';
 
+const hasAiDevRoutes = import.meta.env.DEV;
+
 const QASection = ({ data, fields, fileName }) => {
   const [query, setQuery] = useState('');
   const [chatHistory, setChatHistory] = useState([
@@ -51,6 +53,19 @@ const QASection = ({ data, fields, fileName }) => {
 
     try {
       const digest = buildDatasetDigest(data, fields);
+
+      if (!hasAiDevRoutes) {
+        setUsingFallback(true);
+        setChatHistory((prev) => [
+          ...prev,
+          {
+            role: 'ai',
+            text: buildLocalQaAnswer({ question: userMsg, dataset: digest, fileName }),
+          },
+        ]);
+        return;
+      }
+
       const response = await fetch('/api/ai/qa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
