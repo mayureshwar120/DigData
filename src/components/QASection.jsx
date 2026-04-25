@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MessageSquare, Send, Bot, User } from 'lucide-react';
 import { buildDatasetDigest } from '../lib/datasetDigest';
+import { buildLocalQaAnswer, isMissingAiRouteError } from '../lib/localAiFallback';
 
 const QASection = ({ data, fields, fileName }) => {
   const [query, setQuery] = useState('');
@@ -9,6 +10,7 @@ const QASection = ({ data, fields, fileName }) => {
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState('');
+  const [usingFallback, setUsingFallback] = useState(false);
 
   const toFriendlyError = (message) => {
     const raw = String(message || '');
@@ -45,6 +47,7 @@ const QASection = ({ data, fields, fileName }) => {
     setQuery('');
     setIsTyping(true);
     setError('');
+    setUsingFallback(false);
 
     try {
       const digest = buildDatasetDigest(data, fields);
@@ -64,17 +67,31 @@ const QASection = ({ data, fields, fileName }) => {
         throw new Error(payload.error ? `${payload.error} (HTTP ${response.status})` : `AI request failed (HTTP ${response.status})`);
       }
 
+      setUsingFallback(Boolean(payload.fallback));
       setChatHistory((prev) => [...prev, { role: 'ai', text: payload.text || 'No answer returned.' }]);
     } catch (requestError) {
-      const friendly = toFriendlyError(requestError.message);
-      setError(friendly);
-      setChatHistory((prev) => [
-        ...prev,
-        {
-          role: 'ai',
-          text: friendly,
-        },
-      ]);
+      const digest = buildDatasetDigest(data, fields);
+
+      if (isMissingAiRouteError(requestError.message)) {
+        setUsingFallback(true);
+        setChatHistory((prev) => [
+          ...prev,
+          {
+            role: 'ai',
+            text: buildLocalQaAnswer({ question: userMsg, dataset: digest, fileName }),
+          },
+        ]);
+      } else {
+        const friendly = toFriendlyError(requestError.message);
+        setError(friendly);
+        setChatHistory((prev) => [
+          ...prev,
+          {
+            role: 'ai',
+            text: friendly,
+          },
+        ]);
+      }
     } finally {
       setIsTyping(false);
     }
@@ -140,6 +157,11 @@ const QASection = ({ data, fields, fileName }) => {
           <Send size={18} />
         </button>
       </form>
+      {usingFallback && !error && (
+        <p style={{ color: 'var(--text-muted)', marginTop: '8px', fontSize: '0.82rem' }}>
+          Using browser-side answers because the AI backend is unavailable in this runtime.
+        </p>
+      )}
       {error && <p style={{ color: '#fca5a5', marginTop: '8px', fontSize: '0.82rem' }}>{error}</p>}
 
       <style dangerouslySetInnerHTML={{__html: `

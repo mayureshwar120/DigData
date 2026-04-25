@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Sparkles, TrendingUp, AlertCircle, Info, Activity } from 'lucide-react';
 import { buildDatasetDigest } from '../lib/datasetDigest';
+import { buildLocalInsights, isMissingAiRouteError } from '../lib/localAiFallback';
 
 const isNumeric = (value) => typeof value === 'number' && Number.isFinite(value);
 
@@ -48,6 +49,7 @@ const AIInsights = ({ data, fields, fileName }) => {
   const [aiSummary, setAiSummary] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [usingFallback, setUsingFallback] = useState(false);
 
   const toFriendlyError = (message) => {
     const raw = String(message || '');
@@ -174,6 +176,7 @@ const AIInsights = ({ data, fields, fileName }) => {
       setAiLoading(true);
       setAiError('');
       setAiSummary('');
+      setUsingFallback(false);
 
       try {
         const response = await fetch('/api/ai/insights', {
@@ -193,10 +196,16 @@ const AIInsights = ({ data, fields, fileName }) => {
 
         if (!cancelled) {
           setAiSummary(payload.text || '');
+          setUsingFallback(Boolean(payload.fallback));
         }
       } catch (error) {
         if (!cancelled) {
-          setAiError(toFriendlyError(error.message));
+          if (isMissingAiRouteError(error.message)) {
+            setAiSummary(buildLocalInsights(datasetDigest, fileName));
+            setUsingFallback(true);
+          } else {
+            setAiError(toFriendlyError(error.message));
+          }
         }
       } finally {
         if (!cancelled) {
@@ -323,6 +332,11 @@ const AIInsights = ({ data, fields, fileName }) => {
         <h4 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '8px' }}>Model Narrative</h4>
         {aiLoading && <p style={{ color: 'var(--text-muted)', fontSize: '0.86rem' }}>Generating grounded insights from your data...</p>}
         {aiError && <p style={{ color: '#fca5a5', fontSize: '0.86rem' }}>{aiError}</p>}
+        {!aiLoading && !aiError && usingFallback && (
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '8px' }}>
+            Using browser-side fallback analysis because the AI backend is unavailable in this runtime.
+          </p>
+        )}
         {!aiLoading && !aiError && aiSummary && (
           <pre style={{ whiteSpace: 'pre-wrap', margin: 0, color: 'var(--text-muted)', fontSize: '0.84rem', lineHeight: 1.55, fontFamily: 'inherit' }}>
             {aiSummary}
