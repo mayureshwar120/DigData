@@ -343,11 +343,6 @@ const AIInsights = ({ data, fields, fileName }) => {
         <h4 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '8px' }}>Model Narrative</h4>
         {aiLoading && <p style={{ color: 'var(--text-muted)', fontSize: '0.86rem' }}>Generating grounded insights from your data...</p>}
         {aiError && <p style={{ color: '#fca5a5', fontSize: '0.86rem' }}>{aiError}</p>}
-        {!aiLoading && !aiError && usingFallback && (
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '8px' }}>
-            Using browser-side fallback analysis because the AI backend is unavailable in this runtime.
-          </p>
-        )}
         {!aiLoading && !aiError && aiSummary && (
           <pre style={{ whiteSpace: 'pre-wrap', margin: 0, color: 'var(--text-muted)', fontSize: '0.84rem', lineHeight: 1.55, fontFamily: 'inherit' }}>
             {aiSummary}

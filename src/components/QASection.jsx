@@ -172,11 +172,6 @@ const QASection = ({ data, fields, fileName }) => {
           <Send size={18} />
         </button>
       </form>
-      {usingFallback && !error && (
-        <p style={{ color: 'var(--text-muted)', marginTop: '8px', fontSize: '0.82rem' }}>
-          Using browser-side answers because the AI backend is unavailable in this runtime.
-        </p>
-      )}
       {error && <p style={{ color: '#fca5a5', marginTop: '8px', fontSize: '0.82rem' }}>{error}</p>}
 
       <style dangerouslySetInnerHTML={{__html: `

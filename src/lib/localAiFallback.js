@@ -1,5 +1,6 @@
 const toPercent = (value) => `${(value * 100).toFixed(1)}%`;
 const includesAny = (text, terms) => terms.some((term) => text.includes(term));
+const isGreeting = (text) => /^(hi|hello|hey|hii|yo|good morning|good afternoon|good evening)\b/.test(text.trim());
 
 const describeMetric = (field, metric) => {
   if (metric === 'avg') {
@@ -110,6 +111,20 @@ export const buildLocalQaAnswer = ({ question, dataset, fileName = 'dataset' }) 
       : includesAny(normalizedQuestion, ['count', 'how many values']) ? 'count'
       : null;
 
+  if (isGreeting(normalizedQuestion)) {
+    const numericFieldNames = numericFields.map((field) => field.field);
+    const suggestedField = numericFieldNames[0];
+    if (suggestedField) {
+      return `Hello! I can answer questions about ${fileName}. Try asking about ${suggestedField}, average values, missing data, rows, or columns.`;
+    }
+    return `Hello! I can answer questions about ${fileName}. Ask about rows, columns, missing values, or any field name in the dataset.`;
+  }
+
+  if (includesAny(normalizedQuestion, ['what can you do', 'help', 'how to use', 'what should i ask'])) {
+    const fieldList = (dataset?.fields ?? []).slice(0, 4).join(', ');
+    return `You can ask about rows, columns, missing values, averages, minimums, maximums, or a specific field. Available fields include ${fieldList || 'the uploaded columns'}.`;
+  }
+
   if (normalizedQuestion.includes('how many row')) {
     return `${fileName} contains ${rowCount} rows.`;
   }
@@ -158,6 +173,10 @@ export const buildLocalQaAnswer = ({ question, dataset, fileName = 'dataset' }) 
     return `I found multiple numeric fields in ${fileName}. Here are their ${label}: ${details}. Ask for a specific field if you want one value only.`;
   }
 
+  if (numericFields.length === 1 && !metric) {
+    return `The main numeric field in ${fileName} is ${numericFields[0].field}. Its average is ${numericFields[0].avg}, minimum is ${numericFields[0].min}, and maximum is ${numericFields[0].max}.`;
+  }
+
   const topMissing = missingEntries
     .filter(([, count]) => Number(count) > 0)
     .sort((a, b) => b[1] - a[1])[0];
@@ -170,8 +189,7 @@ export const buildLocalQaAnswer = ({ question, dataset, fileName = 'dataset' }) 
     .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0];
 
   const summaryParts = [
-    `I could not use the AI backend, so this answer is based on the uploaded dataset digest for ${fileName}.`,
-    `The dataset has ${rowCount} rows and ${dataset?.fields?.length ?? 0} fields.`,
+    `${fileName} has ${rowCount} rows and ${dataset?.fields?.length ?? 0} fields.`,
   ];
 
   if (strongestTrend && Number.isFinite(strongestTrend.delta)) {
