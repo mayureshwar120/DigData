@@ -1,4 +1,24 @@
 const toPercent = (value) => `${(value * 100).toFixed(1)}%`;
+const includesAny = (text, terms) => terms.some((term) => text.includes(term));
+
+const describeMetric = (field, metric) => {
+  if (metric === 'avg') {
+    return `${field.field} has an average of ${field.avg}.`;
+  }
+  if (metric === 'min') {
+    return `${field.field} has a minimum value of ${field.min}.`;
+  }
+  if (metric === 'max') {
+    return `${field.field} has a maximum value of ${field.max}.`;
+  }
+  if (metric === 'count') {
+    return `${field.field} has ${field.count} numeric values in the uploaded dataset.`;
+  }
+
+  const delta = Number(field.last) - Number(field.first);
+  const deltaText = Number.isFinite(delta) ? `${delta.toFixed(2)}` : 'unknown';
+  return `${field.field} has an average of ${field.avg}, a minimum of ${field.min}, a maximum of ${field.max}, and changed by ${deltaText} from the first to the last observed value in the digest.`;
+};
 
 export const buildLocalInsights = (dataset, fileName = 'dataset') => {
   const numericFields = Array.isArray(dataset?.numericSummary) ? dataset.numericSummary : [];
@@ -83,6 +103,12 @@ export const buildLocalQaAnswer = ({ question, dataset, fileName = 'dataset' }) 
   const numericFields = Array.isArray(dataset?.numericSummary) ? dataset.numericSummary : [];
   const missingEntries = Object.entries(dataset?.missingByField ?? {});
   const rowCount = dataset?.rowCount ?? 0;
+  const metric =
+    includesAny(normalizedQuestion, ['average', 'avg', 'mean']) ? 'avg'
+      : includesAny(normalizedQuestion, ['minimum', 'lowest', 'smallest', 'min']) ? 'min'
+      : includesAny(normalizedQuestion, ['maximum', 'highest', 'largest', 'max']) ? 'max'
+      : includesAny(normalizedQuestion, ['count', 'how many values']) ? 'count'
+      : null;
 
   if (normalizedQuestion.includes('how many row')) {
     return `${fileName} contains ${rowCount} rows.`;
@@ -105,9 +131,31 @@ export const buildLocalQaAnswer = ({ question, dataset, fileName = 'dataset' }) 
 
   const matchedField = numericFields.find((field) => normalizedQuestion.includes(String(field.field).toLowerCase()));
   if (matchedField) {
-    const delta = Number(matchedField.last) - Number(matchedField.first);
-    const deltaText = Number.isFinite(delta) ? `${delta.toFixed(2)}` : 'unknown';
-    return `${matchedField.field} has an average of ${matchedField.avg}, a minimum of ${matchedField.min}, a maximum of ${matchedField.max}, and changed by ${deltaText} from the first to the last observed value in the digest.`;
+    return describeMetric(matchedField, metric);
+  }
+
+  if (metric && numericFields.length === 1) {
+    return describeMetric(numericFields[0], metric);
+  }
+
+  if (metric && numericFields.length > 1) {
+    const label =
+      metric === 'avg' ? 'averages'
+        : metric === 'min' ? 'minimums'
+        : metric === 'max' ? 'maximums'
+        : 'numeric counts';
+    const details = numericFields
+      .slice(0, 4)
+      .map((field) => {
+        const value =
+          metric === 'avg' ? field.avg
+            : metric === 'min' ? field.min
+            : metric === 'max' ? field.max
+            : field.count;
+        return `${field.field}: ${value}`;
+      })
+      .join(', ');
+    return `I found multiple numeric fields in ${fileName}. Here are their ${label}: ${details}. Ask for a specific field if you want one value only.`;
   }
 
   const topMissing = missingEntries
